@@ -1,0 +1,39 @@
+--
+-- Article:  https://www.analytics.today/blog/top-3-snowflake-performance-tuning-tactics
+-- 
+
+-- 
+-- This SQL Snippet creates a multi-cluster (scale out) virtual warehouse suitable for batch processing.
+-- The SQL snippet below illustrates the command needed to create a multi-cluster warehouse, which will
+-- automatically suspend after 60 seconds idle time, but use the ECONOMY scaling policy to favour throughput
+-- and saving credits over individual query latency.
+--
+-- If you have a large batch task (eg. a massive load and transformation task), you will typically find you 
+-- have a number of tasks which can be run in parallel, but some are dependent upon the prior steps (ie. run sequentially).
+--
+-- If you use (for example), Airflow, you could submit multiple parallel connections to Snowflake, all using the same VWH
+-- and max out the VWH (which is the most efficient use of resources).  When the VWH is fully loaded queries will be queued
+-- until there are sufficient resources to complete the task, unless you configure it to use multi-cluster.
+--
+-- In this case, Snowflake will create additional (SAME SIZE!!) VWHs provided there's enough work to keep them busy.
+-- Currently (August 2020), ECONOMY scaling policy means, if there's enough queries queued to keep a VWH busy for six minutes
+-- it will automatically allocate a new cluster, and the suspended queries will start.
+-- 
+-- When ANY of the clusters are finished (ie. have no further work to do), Snowflake will automatically suspend those clusters,
+-- and will re-direct further queries to the remaining running clusters, provided they are not running at 100% capacity.
+--
+-- This is important, because most people assume "multi-cluster" (scale-out) is simply for lots of end-user queries.
+-- But it's also a way to efficiently complete batch operations in the shortest possible time, while also automatically adjusting the
+-- VWH size (by adding or suspending clusters).
+--
+
+
+-- Create a multi-cluster warehouse for batch processing
+create or replace warehouse batch_vwh with
+warehouse_size      = SMALL
+min_cluster_count   = 1
+max_cluster_count   = 10
+scaling_policy.     = economy
+auto_suspend.       = 60
+initially_suspended = true;
+
