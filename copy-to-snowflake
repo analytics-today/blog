@@ -1,0 +1,31 @@
+--
+-- Article:  https://www.analytics.today/blog/top-3-snowflake-performance-tuning-tactics
+-- 
+-- The three main methods used to load data into Snowflake in PROD.
+-- These typically load the data from an external stage (cloud storage)
+-- into a "landing" table in Snowflake (make the type TRANSIENT) to save storage space
+-- The principles are the same for both an internal and external stage.
+-- Best advice:  Don't build up terabytes of data to Snowflake to scan.
+-- Either remove the files or oganise them into logicla "directories".
+
+-- Slowest method:  Scan entire stage
+copy into sales_table
+  from @landing_data
+  pattern='.*[.]csv';
+
+-- Most Flexible method:  Limit within directory
+copy into sales_table
+  from @landing_data/sales/transactions/2020/05
+  pattern='.*[.]csv';
+
+-- Fastest method:  A named file
+copy into sales_table
+  from @landing_data/sales/transactions/2020/05/sales_050.csv;
+  
+  
+  -- 
+  -- Be aware, the reference to the "slowest" method is relative
+  -- In reality Snowflake will terabytes of data per hour.
+  -- Just don't let it scan 500 Tb of files on your S3 bucket
+  -- to find a 1Mb file.
+  --
