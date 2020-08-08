@@ -1,0 +1,38 @@
+--
+-- Article:   https://www.analytics.today/blog/top-3-snowflake-performance-tuning-tactics
+-- Author:    John Ryan
+-- Blog site: www.Analytics.Today
+-- Note:      Sign up on the blog site for more interesting articles delivered by mail.
+--
+
+--
+--  The SQL snippet above can help identify potential query performance issues on queries that run for more
+-- than 2 minutes and scan over a megabyte of data. In particular, look out for:
+--
+--     Table Scans:  A high value of PCT_TABLE_SCAN and a large number of MB_SCANNED indicates potential poor query
+--     selectivity on large tables.  Check the query WHERE clause and consider using a cluster key if appropriate.
+--
+--      Spilling:  Any value in SPILL_TO_LOCAL or SPILL_TO_REMOTE indicates a potentially large sort of operation on a 
+--      small virtual warehouse.  Consider moving the query to a bigger warehouse or scaling up the existing warehouse if appropriate.
+-- 
+
+
+-- Identify potential performance issues
+
+select query_id						 as query_id
+,      round(bytes_scanned/1024/1024)     as mb_scanned
+,	 total_elapsed_time / 1000          as elapsed_seconds
+,      (partitions_scanned / 
+        nullif(partitions_total,0)) * 100 as pct_table_scan
+,      percent_scanned_from_cache * 100   as pct_from cache
+,	 bytes_spilled_to_local_storage     as spill_to_local
+,      bytes_spilled_to_remote_storage    as spill_to_remote
+from   snowflake.account_usage.query_history
+where (bytes_spilled_to_local_storage > 1024 * 1024 or
+       bytes_spilled_to_remote_storage > 1024 * 1024 or
+       percentage_scanned_from_cache < 0.1)
+and	 elapsed_seconds > 120
+and    bytes_scanned > 1024 * 1024
+order by elapsed_seconds desc;
+
+
